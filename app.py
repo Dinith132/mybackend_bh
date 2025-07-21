@@ -1,20 +1,21 @@
-from flask import Flask, request, send_file, jsonify
+from flask import Flask, request, send_file, jsonify, after_this_request
 import os
 import uuid
 import tempfile
-from numpy_pipeline import process_video_to_pose_npy  # Your existing function
 import shutil
 import traceback
-import shutil
-from flask import after_this_request
-
-
+from numpy_pipeline import process_video_to_pose_npy  # Your existing function
+from flask_cors import CORS  # Optional, for frontend access from a different origin
 
 app = Flask(__name__)
+CORS(app)  # Optional: Remove if you don’t need cross-origin support
 
 @app.route("/upload", methods=["POST"])
 def upload_video():
     if 'video' not in request.files:
+        print("❌ No 'video' in request.files")
+        print("Files:", request.files)
+        print("Form:", request.form)
         return jsonify({"error": "No video part"}), 400
 
     video_file = request.files['video']
@@ -47,9 +48,9 @@ def upload_video():
 
     except Exception as e:
         print("❌ Error during processing:")
-        import traceback
         traceback.print_exc()
         return jsonify({"error": str(e)}), 500
 
 if __name__ == "__main__":
-    app.run(debug=True)
+    # Accept connections on your LAN IP (e.g., 192.168.x.x)
+    app.run(host="0.0.0.0", port=5000, debug=True)
