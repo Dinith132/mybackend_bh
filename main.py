@@ -5,7 +5,7 @@ from ultralytics import YOLO
 import mediapipe as mp
 import os
 
-def extract_frames(video_path, num_frames=20):
+def extract_frames(video_path, num_frames=10):
     """Extract `num_frames` evenly spaced frames from the video."""
     cap = cv2.VideoCapture(video_path)
     total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
