@@ -83,10 +83,10 @@ def extract_pose_sequence(frames, yolo_model, pose_model):
         sequence.append(keypoints)
 
     # Ensure sequence is exactly 20 frames
-    if len(sequence) >= 20:
-        return sequence[:20]
+    if len(sequence) >= 10:
+        return sequence[:10]
     else:
-        missing = 20 - len(sequence)
+        missing = 10 - len(sequence)
         zero_frame = [0] * (33 * 4)
         return sequence + [zero_frame] * missing
 
