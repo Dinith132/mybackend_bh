@@ -56,16 +56,49 @@ def crop_person(img, box):
 
     return img[y1:y2, x1:x2]
 
+
+def compute_joint_angles(landmarks):
+    # landmarks: shape (33, 4)
+    return np.zeros(6)
+
 def extract_pose_sequence(frames, yolo_model, pose_model):
     """Extract sequence of MediaPipe keypoints for the largest person in each frame."""
-    sequence = []
+    # sequence = []
 
+    # for img in frames:
+    #     # Detect main person
+    #     box = get_main_person_box(img, yolo_model)
+    #     if box is None:
+    #         keypoints = [0] * (33 * 4)
+    #         sequence.append(keypoints)
+    #         continue
+
+    #     # Crop the main person and feed to MediaPipe
+    #     cropped = crop_person(img, box)
+    #     img_rgb = cv2.cvtColor(cropped, cv2.COLOR_BGR2RGB)
+    #     results = pose_model.process(img_rgb)
+
+    #     keypoints = []
+    #     if results.pose_landmarks:
+    #         for lm in results.pose_landmarks.landmark:
+    #             keypoints.extend([lm.x, lm.y, lm.z, lm.visibility])
+    #     else:
+    #         keypoints = [0] * (33 * 4)
+
+    #     sequence.append(keypoints)
+
+    # Ensure sequence is exactly 20 frames
+    sequence = []
+    prev_kps = None
     for img in frames:
         # Detect main person
         box = get_main_person_box(img, yolo_model)
         if box is None:
-            keypoints = [0] * (33 * 4)
-            sequence.append(keypoints)
+            keypoints = np.zeros(33 * 4)          # 132 keypoints
+            joint_angles = np.zeros(6)  # define this
+            velocities = np.zeros(99)             # 99 velocities
+            feat_vec = np.concatenate([keypoints, joint_angles, velocities])
+            sequence.append(feat_vec)
             continue
 
         # Crop the main person and feed to MediaPipe
@@ -74,23 +107,41 @@ def extract_pose_sequence(frames, yolo_model, pose_model):
         results = pose_model.process(img_rgb)
 
         keypoints = []
-        if results.pose_landmarks:
-            for lm in results.pose_landmarks.landmark:
-                keypoints.extend([lm.x, lm.y, lm.z, lm.visibility])
+        # if results.pose_landmarks:
+        #     for lm in results.pose_landmarks.landmark:
+        #         keypoints.extend([lm.x, lm.y, lm.z, lm.visibility])
+        # else:
+        #     keypoints = [0] * (33 * 4)
+
+        # sequence.append(keypoints)
+            # Ensure sequence is exactly 20 frames
+        if not results.pose_landmarks:
+            continue
+        kps = np.array([[lm.x, lm.y, lm.z, lm.visibility] for lm in results.pose_landmarks.landmark])
+        if kps.shape != (33, 4):
+            continue
+        kps_flat = kps.flatten()
+        joint_angles = compute_joint_angles(kps)
+        # 99 velocities (x,y,z for 33 keypoints)
+        if prev_kps is None:
+            velocities = np.zeros(99)
         else:
-            keypoints = [0] * (33 * 4)
+            velocities = (kps[:, :3] - prev_kps[:, :3]).flatten()
+        prev_kps = kps.copy()
+        feat_vec = np.concatenate([kps_flat, joint_angles, velocities])  # (237,)
+        sequence.append(feat_vec)
+        
 
-        sequence.append(keypoints)
+        # keypoints = []
 
-    # Ensure sequence is exactly 20 frames
     if len(sequence) >= 10:
         return sequence[:10]
     else:
         missing = 10 - len(sequence)
-        zero_frame = [0] * (33 * 4)
+        zero_frame = [0] * (237)
         return sequence + [zero_frame] * missing
 
-def process_video_to_pose_npy(video_path, output_X_path, output_y_path, label=3):
+def process_video_to_pose_npy(video_path, output_X_path):
     """Main function: full pipeline from video to .npy pose sequence + label."""
 
     print(f"\n🎬 Processing video: {video_path}")
@@ -111,14 +162,14 @@ def process_video_to_pose_npy(video_path, output_X_path, output_y_path, label=3)
     # Step 3: Extract pose sequence
     sequence = extract_pose_sequence(frames, yolo_model, pose_model)
     X = np.array([sequence])
-    y = np.array([label])
+    # y = np.array([label])
     # os.mkdir(os.path.dirname(output_X_path), exist_ok=True)
     os.makedirs(os.path.dirname(output_X_path), exist_ok=True)
     np.save(output_X_path, X)
-    np.save(output_y_path, y)
+    # np.save(output_y_path, y)
     print(f"✅ Saved features to: {output_X_path}")
-    print(f"✅ Saved labels to: {output_y_path}")
-    print(f"🧠 Shape: X={X.shape}, y={y.shape}")
+    # print(f"✅ Saved labels to: {output_y_path}")
+    # print(f"🧠 Shape: X={X.shape}, y={y.shape}")
 
     # OPTIONAL: Save annotated video
     output_video_path = output_X_path.replace(".npy", "_annotated.mp4")
@@ -163,9 +214,10 @@ def save_annotated_video(frames, output_path, yolo_model, pose_model):
 
 # Example usage
 if __name__ == "__main__":
-    print("dsmkdmslkdmslkdmskl")
     video_path = r"D:\\bha\\app\\mybacked\\input.mp4"
     output_X_path = r"D:\\bha\\app\\mybacked\\output\\x.npy"
-    output_y_path = r"D:\\bha\\app\\mybacked\\output\\y.npy"
+    # output_y_path = r"D:\\bha\\app\\mybacked\\output\\y.npy"
 
-    process_video_to_pose_npy(video_path, output_X_path, output_y_path, label=3)
+    # process_video_to_pose_npy(video_path, output_X_path, output_y_path)
+    process_video_to_pose_npy(video_path, output_X_path)
+
