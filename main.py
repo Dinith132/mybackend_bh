@@ -3,17 +3,29 @@ import cv2
 import numpy as np
 from ultralytics import YOLO
 import mediapipe as mp
+import os
 
-def extract_frames(video_path):
-    """Extract frames from video and return as a list."""
+def extract_frames(video_path, num_frames=20):
+    """Extract `num_frames` evenly spaced frames from the video."""
     cap = cv2.VideoCapture(video_path)
+    total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+
+    if total_frames < num_frames:
+        num_frames = total_frames  # fallback if video is too short
+
+    # Calculate the frame indices to sample
+    frame_indices = np.linspace(0, total_frames - 1, num_frames, dtype=int)
+
     frames = []
-    success, frame = cap.read()
-    while success:
-        frames.append(frame)
+    for idx in frame_indices:
+        cap.set(cv2.CAP_PROP_POS_FRAMES, idx)
         success, frame = cap.read()
+        if success:
+            frames.append(frame)
+
     cap.release()
     return frames
+
 
 def get_main_person_box(img, model):
     """Use YOLO to detect the largest person box (class 0)."""
@@ -100,6 +112,8 @@ def process_video_to_pose_npy(video_path, output_X_path, output_y_path, label=3)
     sequence = extract_pose_sequence(frames, yolo_model, pose_model)
     X = np.array([sequence])
     y = np.array([label])
+    # os.mkdir(os.path.dirname(output_X_path), exist_ok=True)
+    os.makedirs(os.path.dirname(output_X_path), exist_ok=True)
     np.save(output_X_path, X)
     np.save(output_y_path, y)
     print(f"✅ Saved features to: {output_X_path}")
@@ -122,7 +136,7 @@ def save_annotated_video(frames, output_path, yolo_model, pose_model):
 
         # 1. YOLO detection
         box = get_main_person_box(img, yolo_model)
-        if box:
+        if box is not None:
             x, y, w, h = box
             x1, y1 = int(x - w / 2), int(y - h / 2)
             x2, y2 = int(x + w / 2), int(y + h / 2)
