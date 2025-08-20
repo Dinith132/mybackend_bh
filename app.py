@@ -7,6 +7,7 @@ import traceback
 from numpy_pipeline import process_video_to_pose_npy  # Your existing function
 from flask_cors import CORS
 import threading
+import neext.dsd as get_prediction
 
 app = Flask(__name__)
 CORS(app)
@@ -18,17 +19,21 @@ def process_video_async(file_id, input_path):
     try:
         # Simulate or modify process_video_to_pose_npy to return 4 values
         # Replace this with your actual processing logic
-        process_video_to_pose_npy(input_path)  # Assume this returns [prediction, confidence, error_type, analysis_score]
-        result={
-            "prediction": "Good Technique",
-            "confidence": 0.9,
-            "probabilities": {
-                "Good Technique": 0.9,
-                "Low Arm": 0.05,
-                "Poor Left Leg Block": 0.02,
-                "Both Errors": 0.03
-            }
-        }
+
+        # process_video_to_pose_npy(input_path)  # Assume this returns [prediction, confidence, error_type, analysis_score]
+        
+        result= get_prediction.final_prediction(input_path)
+        # print(array)
+        # result={
+        #     "prediction": "Good Technique",
+        #     "confidence": 0.9,
+        #     "probabilities": {
+        #         "Good Technique": 0.9,
+        #         "Low Arm": 0.05,
+        #         "Poor Left Leg Block": 0.02,
+        #         "Both Errors": 0.03
+        #     }
+        # }
         processed_files[file_id]['status'] = 'completed'
         processed_files[file_id]['result'] = result
     except Exception as e:
@@ -103,6 +108,7 @@ def check_status(file_id):
             "file_id": file_id
         }), 200
     elif status_info['status'] == 'completed':
+        print("=======================================completed=====================")
         result = status_info['result']
         # Clean up temporary directory
         try:
