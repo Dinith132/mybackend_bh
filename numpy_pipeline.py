@@ -141,7 +141,7 @@ def extract_pose_sequence(frames, yolo_model, pose_model):
         zero_frame = [0] * (237)
         return sequence + [zero_frame] * missing
 
-def process_video_to_pose_npy(video_path, output_X_path):
+def process_video_to_pose_npy(video_path, output_X_path="D:\\bha\\app\\mybacked\\output\\x.npy"):
     """Main function: full pipeline from video to .npy pose sequence + label."""
 
     print(f"\n🎬 Processing video: {video_path}")

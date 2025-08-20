@@ -1,14 +1,47 @@
-from flask import Flask, request, send_file, jsonify, after_this_request
+import shutil
+from flask import Flask, request, jsonify
 import os
 import uuid
 import tempfile
-import shutil
 import traceback
 from numpy_pipeline import process_video_to_pose_npy  # Your existing function
-from flask_cors import CORS  # Optional, for frontend access from a different origin
+from flask_cors import CORS
+import threading
 
 app = Flask(__name__)
-CORS(app)  # Optional: Remove if you don’t need cross-origin support
+CORS(app)
+
+# Store for tracking processed files and their status
+processed_files = {}
+
+def process_video_async(file_id, input_path):
+    try:
+        # Simulate or modify process_video_to_pose_npy to return 4 values
+        # Replace this with your actual processing logic
+        process_video_to_pose_npy(input_path)  # Assume this returns [prediction, confidence, error_type, analysis_score]
+        result={
+            "prediction": "Good Technique",
+            "confidence": 0.9,
+            "probabilities": {
+                "Good Technique": 0.9,
+                "Low Arm": 0.05,
+                "Poor Left Leg Block": 0.02,
+                "Both Errors": 0.03
+            }
+        }
+        processed_files[file_id]['status'] = 'completed'
+        processed_files[file_id]['result'] = result
+    except Exception as e:
+        processed_files[file_id]['status'] = 'failed'
+        processed_files[file_id]['error'] = str(e)
+        print(f"❌ Error processing video {file_id}: {str(e)}")
+        traceback.print_exc()
+    finally:
+        # Clean up input file
+        try:
+            os.remove(input_path)
+        except Exception as e:
+            print(f"⚠️ Cleanup failed: {e}")
 
 @app.route("/upload", methods=["POST"])
 def upload_video():
@@ -23,34 +56,72 @@ def upload_video():
         return jsonify({"error": "No selected video"}), 400
 
     try:
-        with tempfile.TemporaryDirectory() as tmpdir:
-            input_path = os.path.join(tmpdir, "input.mp4")
-            temp_output_path = os.path.join(tmpdir, "output.npy")
+        file_id = str(uuid.uuid4())
+        temp_dir = tempfile.mkdtemp()
+        input_path = os.path.join(temp_dir, "input.mp4")
 
-            video_file.save(input_path)
-            process_video_to_pose_npy(input_path, temp_output_path)
+        # Save the video file
+        video_file.save(input_path)
 
-            # Copy to a new temp file outside the auto-deleting dir
-            stable_output = tempfile.NamedTemporaryFile(delete=False, suffix=".npy")
-            stable_output.close()  # Close it so we can write to it
+        # Store initial status
+        processed_files[file_id] = {
+            'status': 'processing',
+            'temp_dir': temp_dir,
+            'result': None,
+            'error': None
+        }
 
-            shutil.copy2(temp_output_path, stable_output.name)
+        # Start background processing
+        threading.Thread(
+            target=process_video_async,
+            args=(file_id, input_path),
+            daemon=True
+        ).start()
 
-            @after_this_request
-            def cleanup(response):
-                try:
-                    os.remove(stable_output.name)
-                except Exception as e:
-                    print(f"⚠️ Cleanup failed: {e}")
-                return response
-
-            return send_file(stable_output.name, as_attachment=True, download_name="pose_features.npy")
+        return jsonify({
+            "message": "Video uploaded successfully",
+            "file_id": file_id,
+            "status_url": f"/status/{file_id}"
+        }), 202
 
     except Exception as e:
-        print("❌ Error during processing:")
+        print("❌ Error during upload:")
         traceback.print_exc()
-        return jsonify({"error": str(e)}), 500
+        return jsonify({"error": f"Upload failed: {str(e)}"}), 500
+
+@app.route("/status/<file_id>", methods=["GET"])
+def check_status(file_id):
+    if file_id not in processed_files:
+        return jsonify({"error": "File not found or expired"}), 404
+
+    status_info = processed_files[file_id]
+    
+    if status_info['status'] == 'processing':
+        return jsonify({
+            "message": "Video is still processing",
+            "status": "processing",
+            "file_id": file_id
+        }), 200
+    elif status_info['status'] == 'completed':
+        result = status_info['result']
+        # Clean up temporary directory
+        try:
+            shutil.rmtree(status_info['temp_dir'])
+            del processed_files[file_id]
+        except Exception as e:
+            print(f"⚠️ Cleanup failed: {e}")
+        return jsonify({
+            "message": "Video processed successfully",
+            "result": result
+        }), 200
+    else:  # failed
+        error = status_info['error']
+        try:
+            shutil.rmtree(status_info['temp_dir'])
+            del processed_files[file_id]
+        except Exception as e:
+            print(f"⚠️ Cleanup failed: {e}")
+        return jsonify({"error": f"Processing failed: {error}"}), 500
 
 if __name__ == "__main__":
-    # Accept connections on your LAN IP (e.g., 192.168.x.x)
     app.run(host="0.0.0.0", port=5000, debug=True)
