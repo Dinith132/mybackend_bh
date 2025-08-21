@@ -7,9 +7,9 @@ from ultralytics import YOLO
 import math
 
 # === Paths ===
-VIDEO_PATH = "D:\\bha\\app\\mybacked\\neext\\input.mp4"
-SCALER_PATH = "D:\\bha\\app\\mybacked\\neext\\scaler.save"
-MODEL_PATH = "D:\\bha\\app\\mybacked\\neext\\final_model_attention.keras"
+VIDEO_PATH = "D:\\bha\\app\\final_backed_dep\\neext\\input.mp4"
+SCALER_PATH = "D:\\bha\\app\\final_backed_dep\\neext\\scaler.save"
+MODEL_PATH = "D:\\bha\\app\\final_backed_dep\\neext\\final_model_attention.keras"
 
 # === Load model and scaler ===
 model = tf.keras.models.load_model(MODEL_PATH)
@@ -46,7 +46,7 @@ def extract_joint_angles(landmarks):
     joints.append(calculate_angle(landmarks[23][:3], landmarks[25][:3], landmarks[27][:3]))
     return np.array(joints)
 
-# # === Step 1: Extract 10 annotated frames and features ===
+
 # def extract_features_from_video(video_path, max_frames=10):
 #     print("Extracting Features...")
 #     cap = cv2.VideoCapture(video_path)
@@ -54,32 +54,32 @@ def extract_joint_angles(landmarks):
 #     features = []
 #     frame_count = 0
 
-#     while cap.isOpened() and frame_count < max_frames:
-#         print(f"processing frame {frame_count+1} ...")
-#         ret, frame = cap.read()
-#         if not ret:
-#             break
+#     with mp_pose.Pose(static_image_mode=False, model_complexity=1, min_detection_confidence=0.5) as pose:
+#         while cap.isOpened() and frame_count < max_frames:
+#             print(f"processing frame {frame_count+1} ...")
+#             ret, frame = cap.read()
+#             if not ret:
+#                 break
 
-#         results = yolo(frame, verbose=False)
-#         if isinstance(results, list) and len(results) > 0:
-#             result = results[0]
-#             if hasattr(result, 'boxes') and result.boxes.xyxy.shape[0] > 0:
-#                 x1, y1, x2, y2 = result.boxes.xyxy.cpu().numpy()[0].astype(int)
-#                 cropped = frame[y1:y2, x1:x2]
-#                 rgb = cv2.cvtColor(cropped, cv2.COLOR_BGR2RGB)
-#                 results_pose = pose.process(rgb)
+#             results = yolo(frame, verbose=False)
+#             if isinstance(results, list) and len(results) > 0:
+#                 result = results[0]
+#                 if hasattr(result, 'boxes') and result.boxes.xyxy.shape[0] > 0:
+#                     x1, y1, x2, y2 = result.boxes.xyxy.cpu().numpy()[0].astype(int)
+#                     cropped = frame[y1:y2, x1:x2]
+#                     rgb = cv2.cvtColor(cropped, cv2.COLOR_BGR2RGB)
+#                     results_pose = pose.process(rgb)
 
-#                 if results_pose.pose_landmarks:
-#                     landmarks = np.array(results_pose.pose_landmarks.landmark)
-#                     landmark_array = np.array([[lm.x, lm.y, lm.z, lm.visibility] for lm in landmarks])
-#                     joint_angles = extract_joint_angles(landmark_array)  # shape (6,)
-#                     pose_feats = landmark_array.flatten()  # shape (132,)
-#                     full_feature = np.concatenate([pose_feats, joint_angles])  # 138
-#                     features.append(full_feature)
-#                     frame_count += 1
+#                     if results_pose.pose_landmarks:
+#                         landmarks = np.array(results_pose.pose_landmarks.landmark)
+#                         landmark_array = np.array([[lm.x, lm.y, lm.z, lm.visibility] for lm in landmarks])
+#                         joint_angles = extract_joint_angles(landmark_array)  # shape (6,)
+#                         pose_feats = landmark_array.flatten()  # shape (132,)
+#                         full_feature = np.concatenate([pose_feats, joint_angles])  # 138
+#                         features.append(full_feature)
+#                         frame_count += 1
 
 #     cap.release()
-#     pose.close()
 
 #     while len(features) < 10:
 #         features.append(np.zeros(138))
@@ -89,16 +89,26 @@ def extract_joint_angles(landmarks):
 def extract_features_from_video(video_path, max_frames=10):
     print("Extracting Features...")
     cap = cv2.VideoCapture(video_path)
-    print("cv2 done")
+    total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+    print(f"Total frames in video: {total_frames}")
+
+    if total_frames == 0:
+        print("Video has no frames.")
+        return np.zeros((max_frames, 138))
+
+    # Compute evenly spaced frame indices
+    frame_indices = np.linspace(0, total_frames - 1, max_frames, dtype=int)
+
     features = []
-    frame_count = 0
 
     with mp_pose.Pose(static_image_mode=False, model_complexity=1, min_detection_confidence=0.5) as pose:
-        while cap.isOpened() and frame_count < max_frames:
-            print(f"processing frame {frame_count+1} ...")
+        for idx in frame_indices:
+            print(f"Processing frame {idx} ...")
+            cap.set(cv2.CAP_PROP_POS_FRAMES, idx)  # Jump to that frame
             ret, frame = cap.read()
             if not ret:
-                break
+                features.append(np.zeros(138))
+                continue
 
             results = yolo(frame, verbose=False)
             if isinstance(results, list) and len(results) > 0:
@@ -116,14 +126,13 @@ def extract_features_from_video(video_path, max_frames=10):
                         pose_feats = landmark_array.flatten()  # shape (132,)
                         full_feature = np.concatenate([pose_feats, joint_angles])  # 138
                         features.append(full_feature)
-                        frame_count += 1
+                        continue
+
+            # If no detection, append zeros
+            features.append(np.zeros(138))
 
     cap.release()
-
-    while len(features) < 10:
-        features.append(np.zeros(138))
-
-    return np.array(features)[:10]
+    return np.array(features)
 
 
 # === Step 2: Final tensor prep ===
@@ -138,6 +147,71 @@ def prepare_input_tensor(frames_10):
     return np.expand_dims(final_scaled, axis=0)  # (1, 10, 237)
 
 # === Step 3: Predict ===
+# === New: Save frames with YOLO + Pose landmarks ===
+
+
+
+def save_frames_with_pose(video_path, output_dir="D:\\bha\\app\\final_backed_dep\\output", max_frames=50):
+    """
+    Save the frames (cropped + pose drawn) that are actually used for prediction.
+    They will be distributed across the whole video, same as in extract_features_from_video().
+    """
+    print("Saving frames with YOLO + Pose...")
+    os.makedirs(output_dir, exist_ok=True)
+
+    cap = cv2.VideoCapture(video_path)
+    total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+    print(f"Total frames in video: {total_frames}")
+
+    if total_frames == 0:
+        print("Video has no frames.")
+        return
+
+    # Compute evenly spaced frame indices
+    frame_indices = np.linspace(0, total_frames - 1, max_frames, dtype=int)
+
+    with mp_pose.Pose(static_image_mode=False, model_complexity=1, min_detection_confidence=0.5) as pose:
+        for i, idx in enumerate(frame_indices):
+            cap.set(cv2.CAP_PROP_POS_FRAMES, idx)  # jump to target frame
+            ret, frame = cap.read()
+            if not ret:
+                print(f"⚠️ Could not read frame {idx}")
+                continue
+
+            results = yolo(frame, verbose=False)
+            if isinstance(results, list) and len(results) > 0:
+                result = results[0]
+                if hasattr(result, 'boxes') and result.boxes.xyxy.shape[0] > 0:
+                    x1, y1, x2, y2 = result.boxes.xyxy.cpu().numpy()[0].astype(int)
+                    cropped = frame[y1:y2, x1:x2]
+                    rgb = cv2.cvtColor(cropped, cv2.COLOR_BGR2RGB)
+                    results_pose = pose.process(rgb)
+
+                    # Draw pose landmarks if detected
+                    if results_pose.pose_landmarks:
+                        mp.solutions.drawing_utils.draw_landmarks(
+                            cropped,
+                            results_pose.pose_landmarks,
+                            mp_pose.POSE_CONNECTIONS,
+                            landmark_drawing_spec=mp.solutions.drawing_styles.get_default_pose_landmarks_style()
+                        )
+
+                    # Save the processed frame
+                    save_path = os.path.join(output_dir, f"frame_{i+1}.jpg")
+                    cv2.imwrite(save_path, cropped)
+                    print(f"✅ Saved {save_path}")
+            else:
+                print(f"⚠️ No detection in frame {idx}")
+
+    cap.release()
+    print("All selected frames saved.")
+
+
+# Example usage:
+# save_frames_with_pose(VIDEO_PATH, output_dir="debug_frames", max_frames=10)
+
+
+
 
 def final_prediction(video_path):
     frames = extract_features_from_video(video_path)
@@ -145,6 +219,8 @@ def final_prediction(video_path):
     print("Getting the prediction...")
     pred = model.predict(input_tensor)
     print("Prediction Done.")
+
+    save_frames_with_pose(video_path)
 
     # === Display Result ===
     class_names = ['Good Technique', 'Low Arm', 'Poor Left Leg Block', 'Both Errors']
