@@ -8,6 +8,8 @@ from numpy_pipeline import process_video_to_pose_npy  # Your existing function
 from flask_cors import CORS
 import threading
 import neext.dsd as get_prediction
+from flask import send_file
+
 
 app = Flask(__name__)
 CORS(app)
@@ -22,7 +24,7 @@ def process_video_async(file_id, input_path):
 
         # process_video_to_pose_npy(input_path)  # Assume this returns [prediction, confidence, error_type, analysis_score]
         
-        result= get_prediction.final_prediction(input_path)
+        result= get_prediction.final_prediction(input_path, file_id)
         # print(array)
         # result={
         #     "prediction": "Good Technique",
@@ -110,7 +112,6 @@ def check_status(file_id):
     elif status_info['status'] == 'completed':
         print("=======================================completed=====================")
         result = status_info['result']
-        # Clean up temporary directory
         try:
             shutil.rmtree(status_info['temp_dir'])
             del processed_files[file_id]
@@ -118,7 +119,9 @@ def check_status(file_id):
             print(f"⚠️ Cleanup failed: {e}")
         return jsonify({
             "message": "Video processed successfully",
-            "result": result
+            "result": result,
+            "video_url": f"/download/{file_id}",
+            "status":"completed"
         }), 200
     else:  # failed
         error = status_info['error']
@@ -128,6 +131,18 @@ def check_status(file_id):
         except Exception as e:
             print(f"⚠️ Cleanup failed: {e}")
         return jsonify({"error": f"Processing failed: {error}"}), 500
+
+
+@app.route("/download/<file_id>", methods=["GET"])
+def download_video(file_id):
+    video_path = os.path.join("output", f"out{file_id}.mp4")
+    if os.path.exists(video_path):
+        print("=======send the file======")
+        return send_file(video_path, as_attachment=True)
+    else:
+        return jsonify({"error": "Video not found"}), 404
+
+
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000, debug=True)

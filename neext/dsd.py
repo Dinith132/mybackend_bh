@@ -5,6 +5,7 @@ import cv2
 import mediapipe as mp
 from ultralytics import YOLO
 import math
+import os
 
 # === Paths ===
 VIDEO_PATH = "D:\\bha\\app\\final_backed_dep\\neext\\input.mp4"
@@ -151,60 +152,201 @@ def prepare_input_tensor(frames_10):
 
 
 
-def save_frames_with_pose(video_path, output_dir="D:\\bha\\app\\final_backed_dep\\output", max_frames=50):
+# def save_frames_with_pose(video_path, output_dir="D:\\bha\\app\\final_backed_dep\\output", max_frames=50):
+#     """
+#     Save the frames (cropped + pose drawn) that are actually used for prediction.
+#     They will be distributed across the whole video, same as in extract_features_from_video().
+#     """
+#     print("Saving frames with YOLO + Pose...")
+#     os.makedirs(output_dir, exist_ok=True)
+
+#     cap = cv2.VideoCapture(video_path)
+#     total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+#     print(f"Total frames in video: {total_frames}")
+
+#     if total_frames == 0:
+#         print("Video has no frames.")
+#         return
+
+#     # Compute evenly spaced frame indices
+#     frame_indices = np.linspace(0, total_frames - 1, max_frames, dtype=int)
+
+#     with mp_pose.Pose(static_image_mode=False, model_complexity=1, min_detection_confidence=0.5) as pose:
+#         for i, idx in enumerate(frame_indices):
+#             cap.set(cv2.CAP_PROP_POS_FRAMES, idx)  # jump to target frame
+#             ret, frame = cap.read()
+#             if not ret:
+#                 print(f"⚠️ Could not read frame {idx}")
+#                 continue
+
+#             results = yolo(frame, verbose=False)
+#             if isinstance(results, list) and len(results) > 0:
+#                 result = results[0]
+#                 if hasattr(result, 'boxes') and result.boxes.xyxy.shape[0] > 0:
+#                     x1, y1, x2, y2 = result.boxes.xyxy.cpu().numpy()[0].astype(int)
+#                     cropped = frame[y1:y2, x1:x2]
+#                     rgb = cv2.cvtColor(cropped, cv2.COLOR_BGR2RGB)
+#                     results_pose = pose.process(rgb)
+
+#                     # Draw pose landmarks if detected
+#                     if results_pose.pose_landmarks:
+#                         mp.solutions.drawing_utils.draw_landmarks(
+#                             cropped,
+#                             results_pose.pose_landmarks,
+#                             mp_pose.POSE_CONNECTIONS,
+#                             landmark_drawing_spec=mp.solutions.drawing_styles.get_default_pose_landmarks_style()
+#                         )
+
+#                     # Save the processed frame
+#                     save_path = os.path.join(output_dir, f"frame_{i+1}.jpg")
+#                     cv2.imwrite(save_path, cropped)
+#                     print(f"✅ Saved {save_path}")
+#             else:
+#                 print(f"⚠️ No detection in frame {idx}")
+
+#     cap.release()
+#     print("All selected frames saved.")
+
+
+# def save_frames_with_pose(video_path, output_path="D:\\bha\\app\\final_backed_dep\\output\\out.mp4"):
+#     """
+#     Process the whole video:
+#     - Detect main person with YOLO
+#     - Draw bounding box + pose landmarks
+#     - Save as a full video
+#     """
+#     cap = cv2.VideoCapture(video_path)
+#     if not cap.isOpened():
+#         print("❌ Could not open video")
+#         return
+
+#     # Video properties
+#     fps = 25
+#     width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+#     height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+
+#     # Output video writer
+#     fourcc = cv2.VideoWriter_fourcc(*'mp4v')
+#     out = cv2.VideoWriter(output_path, fourcc, fps, (width, height))
+
+#     with mp_pose.Pose(
+#         static_image_mode=False,
+#         model_complexity=1,
+#         min_detection_confidence=0.5
+#     ) as pose:
+
+#         frame_count = 0
+#         while True:
+#             ret, frame = cap.read()
+#             if not ret:
+#                 break
+#             frame_count += 1
+
+#             # --- YOLO detection ---
+#             results = yolo(frame, verbose=False)
+#             if isinstance(results, list) and len(results) > 0:
+#                 result = results[0]
+#                 if hasattr(result, "boxes") and result.boxes.xyxy.shape[0] > 0:
+#                     x1, y1, x2, y2 = result.boxes.xyxy.cpu().numpy()[0].astype(int)
+#                     cv2.rectangle(frame, (x1, y1), (x2, y2), (0, 255, 0), 2)
+#                     cv2.putText(frame, "Athlete", (x1, y1 - 10),
+#                                 cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 0), 2)
+
+#                     # --- Pose estimation on cropped person ---
+#                     cropped = frame[y1:y2, x1:x2]
+#                     if cropped.size > 0:  # avoid empty crop
+#                         rgb = cv2.cvtColor(cropped, cv2.COLOR_BGR2RGB)
+#                         results_pose = pose.process(rgb)
+
+#                         if results_pose.pose_landmarks:
+#                             for lm in results_pose.pose_landmarks.landmark:
+#                                 cx = int(x1 + lm.x * (x2 - x1))
+#                                 cy = int(y1 + lm.y * (y2 - y1))
+#                                 cv2.circle(frame, (cx, cy), 3, (255, 0, 0), -1)
+
+#             out.write(frame)
+#             if frame_count % 50 == 0:
+#                 print(f"Processed {frame_count} frames...")
+
+#     cap.release()
+#     out.release()
+#     print(f"🎥 Pose video saved at {output_path}")
+
+import cv2
+import mediapipe as mp
+import numpy as np
+
+mp_pose = mp.solutions.pose
+
+def save_frames_with_pose(video_path,file_id, output_path="D:\\bha\\app\\final_backed_dep\\output", num_frames=50):
     """
-    Save the frames (cropped + pose drawn) that are actually used for prediction.
-    They will be distributed across the whole video, same as in extract_features_from_video().
+    Sample `num_frames` evenly spaced frames from the video,
+    detect main person with YOLO, overlay pose landmarks,
+    and save as a video.
     """
-    print("Saving frames with YOLO + Pose...")
-    os.makedirs(output_dir, exist_ok=True)
+    output_path=f"{output_path}\\out{file_id}.mp4"
 
     cap = cv2.VideoCapture(video_path)
-    total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
-    print(f"Total frames in video: {total_frames}")
-
-    if total_frames == 0:
-        print("Video has no frames.")
+    if not cap.isOpened():
+        print("❌ Could not open video")
         return
 
-    # Compute evenly spaced frame indices
-    frame_indices = np.linspace(0, total_frames - 1, max_frames, dtype=int)
+    total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+    fps = 25  # output FPS (can adjust)
+    width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+    height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
 
-    with mp_pose.Pose(static_image_mode=False, model_complexity=1, min_detection_confidence=0.5) as pose:
+    # Adjust num_frames if video is too short
+    if total_frames < num_frames:
+        num_frames = total_frames
+
+    # Compute evenly spaced frame indices
+    frame_indices = np.linspace(0, total_frames - 1, num_frames, dtype=int)
+
+    # Video writer
+    fourcc = cv2.VideoWriter_fourcc(*'mp4v')
+    out = cv2.VideoWriter(output_path, fourcc, fps, (width, height))
+
+    with mp_pose.Pose(
+        static_image_mode=False,
+        model_complexity=1,
+        min_detection_confidence=0.5
+    ) as pose:
+
         for i, idx in enumerate(frame_indices):
-            cap.set(cv2.CAP_PROP_POS_FRAMES, idx)  # jump to target frame
+            cap.set(cv2.CAP_PROP_POS_FRAMES, idx)
             ret, frame = cap.read()
             if not ret:
                 print(f"⚠️ Could not read frame {idx}")
                 continue
 
+            # --- YOLO detection ---
             results = yolo(frame, verbose=False)
             if isinstance(results, list) and len(results) > 0:
                 result = results[0]
-                if hasattr(result, 'boxes') and result.boxes.xyxy.shape[0] > 0:
+                if hasattr(result, "boxes") and result.boxes.xyxy.shape[0] > 0:
                     x1, y1, x2, y2 = result.boxes.xyxy.cpu().numpy()[0].astype(int)
+                    cv2.rectangle(frame, (x1, y1), (x2, y2), (0, 255, 0), 2)
+                    cv2.putText(frame, "Athlete", (x1, y1 - 10),
+                                cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 0), 2)
+
+                    # --- Pose estimation ---
                     cropped = frame[y1:y2, x1:x2]
-                    rgb = cv2.cvtColor(cropped, cv2.COLOR_BGR2RGB)
-                    results_pose = pose.process(rgb)
+                    if cropped.size > 0:
+                        rgb = cv2.cvtColor(cropped, cv2.COLOR_BGR2RGB)
+                        results_pose = pose.process(rgb)
+                        if results_pose.pose_landmarks:
+                            for lm in results_pose.pose_landmarks.landmark:
+                                cx = int(x1 + lm.x * (x2 - x1))
+                                cy = int(y1 + lm.y * (y2 - y1))
+                                cv2.circle(frame, (cx, cy), 3, (255, 0, 0), -1)
 
-                    # Draw pose landmarks if detected
-                    if results_pose.pose_landmarks:
-                        mp.solutions.drawing_utils.draw_landmarks(
-                            cropped,
-                            results_pose.pose_landmarks,
-                            mp_pose.POSE_CONNECTIONS,
-                            landmark_drawing_spec=mp.solutions.drawing_styles.get_default_pose_landmarks_style()
-                        )
-
-                    # Save the processed frame
-                    save_path = os.path.join(output_dir, f"frame_{i+1}.jpg")
-                    cv2.imwrite(save_path, cropped)
-                    print(f"✅ Saved {save_path}")
-            else:
-                print(f"⚠️ No detection in frame {idx}")
+            out.write(frame)
+            print(f"✅ Saved frame {i+1}/{num_frames} to video")
 
     cap.release()
-    print("All selected frames saved.")
+    out.release()
+    print(f"🎥 Pose video saved at {output_path}")
 
 
 # Example usage:
@@ -213,14 +355,14 @@ def save_frames_with_pose(video_path, output_dir="D:\\bha\\app\\final_backed_dep
 
 
 
-def final_prediction(video_path):
+def final_prediction(video_path, file_id):
     frames = extract_features_from_video(video_path)
     input_tensor = prepare_input_tensor(frames)
     print("Getting the prediction...")
     pred = model.predict(input_tensor)
     print("Prediction Done.")
 
-    save_frames_with_pose(video_path)
+    save_frames_with_pose(video_path, file_id)
 
     # === Display Result ===
     class_names = ['Good Technique', 'Low Arm', 'Poor Left Leg Block', 'Both Errors']
