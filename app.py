@@ -183,7 +183,7 @@ def process_video_async(file_id, input_path):
 
         processed_files[file_id]['status'] = 'completed'
         processed_files[file_id]['result'] = result
-
+ 
     except Exception as e:
         processed_files[file_id]['status'] = 'failed'
         processed_files[file_id]['error'] = str(e)
@@ -201,6 +201,11 @@ def process_video_async(file_id, input_path):
 # --- Routes ---
 @app.route("/upload", methods=["POST"])
 def upload_video():
+    print(">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>")
+    print(">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>")
+    print("uploaded")
+    print(">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>")
+    
     if 'video' not in request.files:
         return jsonify({"error": "No video part"}), 400
 
