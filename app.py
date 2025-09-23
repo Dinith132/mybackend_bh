@@ -213,6 +213,12 @@ def upload_video():
         temp_dir = tempfile.mkdtemp()
         input_path = os.path.join(temp_dir, "input.mp4")
 
+        print("=====================================")
+        print("=====================================")
+        print(input_path)
+        print("=====================================")
+        print("=====================================")
+
         # Save uploaded file
         video_file.save(input_path)
 
