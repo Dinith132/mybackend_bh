@@ -230,6 +230,12 @@ def upload_video():
             'error': None
         }
 
+        print("----------------------------------------")
+        print("----------------------------------------")
+        print(processed_files[file_id])
+        print("----------------------------------------")
+
+
         # Start background processing
         threading.Thread(
             target=process_video_async,
@@ -250,6 +256,14 @@ def upload_video():
 
 @app.route("/status/<file_id>", methods=["GET"])
 def check_status(file_id):
+    print("+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++")
+    print()
+    print(processed_files)
+    print()
+    print("+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++")
+    print(file_id)
+    print("+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++")
+
     if file_id not in processed_files:
         return jsonify({"error": "File not found or expired"}), 404
 
