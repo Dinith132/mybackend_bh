@@ -147,7 +147,6 @@
 # if __name__ == "__main__":
 #     app.run(host="0.0.0.0", port=5000, debug=True)
 
-
 import os
 import uuid
 import tempfile
@@ -160,7 +159,7 @@ from flask_cors import CORS
 
 # Import your custom modules
 from numpy_pipeline import process_video_to_pose_npy
-import neext.dsd as get_prediction
+import neext.dsd_old as get_prediction
 
 # --- Flask App Setup ---
 app = Flask(__name__)
@@ -171,7 +170,7 @@ CORS(app)
 processed_files = {}
 
 # Ensure 'output' folder exists and is writable
-OUTPUT_DIR = "output"
+OUTPUT_DIR = "/home/ubuntu/mybackend_bh/neext/output"
 os.makedirs(OUTPUT_DIR, exist_ok=True)
 
 
@@ -311,9 +310,12 @@ def check_status(file_id):
 @app.route("/download/<file_id>", methods=["GET"])
 def download_video(file_id):
     video_path = os.path.join(OUTPUT_DIR, f"out{file_id}.mp4")
+    print(f"----------------------------{video_path}")
     if os.path.exists(video_path):
+        print("//////////outit")
         return send_file(video_path, as_attachment=True)
     else:
+        print("///////nope")
         return jsonify({"error": "Video not found"}), 404
 
 

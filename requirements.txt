@@ -1,8 +1,0 @@
-scikit-learn
-flask
-flask_cors
-opencv-python
-ultralytics
-mediapipe
-joblib
-tensorflow
