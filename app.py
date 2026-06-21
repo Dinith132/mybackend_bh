@@ -8,10 +8,6 @@ import traceback
 from flask import Flask, request, jsonify, send_file
 from flask_cors import CORS
 
-# Import your custom modules
-from numpy_pipeline import process_video_to_pose_npy
-import neext.dsd_old as get_prediction
-
 # --- Flask App Setup ---
 app = Flask(__name__)
 # Restrict CORS in production; for now, allow all for testing
@@ -26,10 +22,14 @@ os.makedirs(OUTPUT_DIR, exist_ok=True)
 
 
 # --- Video Processing Thread ---
+def run_prediction(input_path, file_id):
+    import neext.dsd_old as get_prediction
+    return get_prediction.final_prediction(input_path, file_id)
+
+
 def process_video_async(file_id, input_path):
     try:
-        # Call your prediction function
-        result = get_prediction.final_prediction(input_path, file_id)
+        result = run_prediction(input_path, file_id)
 
         processed_files[file_id]['status'] = 'completed'
         processed_files[file_id]['result'] = result

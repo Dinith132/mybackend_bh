@@ -44,8 +44,8 @@ sudo systemctl enable "$SERVICE_NAME"
 sudo systemctl restart "$SERVICE_NAME"
 
 echo "==> Verifying local health check"
-sleep 3
-curl --fail http://127.0.0.1:8000/check
+sleep 5
+curl --fail --retry 5 --retry-delay 3 http://127.0.0.1:8000/check
 
 echo
 echo "Bootstrap complete."

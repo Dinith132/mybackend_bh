@@ -15,17 +15,42 @@ MODEL_PATH = os.path.join(BASE_DIR, "final_model_attention.keras")
 OUTPUT_DIR = os.path.join(BASE_DIR, "output")
 os.makedirs(OUTPUT_DIR, exist_ok=True)
 
-# === Load model and scaler ===
-model = tf.keras.models.load_model(MODEL_PATH)
-scaler = joblib.load(SCALER_PATH)
+PROJECT_ROOT = os.path.dirname(BASE_DIR)
+YOLO_CANDIDATES = [
+    os.path.join(PROJECT_ROOT, "yolov8n.pt"),
+    os.path.join(BASE_DIR, "yolov8n.pt"),
+    "yolov8n.pt",
+]
 
-# === Load YOLO and MediaPipe ===
-yolo = YOLO("yolov8n.pt")
+def resolve_yolo_weights():
+    for candidate in YOLO_CANDIDATES:
+        if os.path.isfile(candidate):
+            return candidate
+    return YOLO_CANDIDATES[0]
+
+_model = None
+_scaler = None
+_yolo = None
 mp_pose = mp.solutions.pose
-
-# ==================== Colab improvements ====================
-
 POSE_CONNS = list(mp_pose.POSE_CONNECTIONS)
+
+
+def _ensure_models_loaded():
+    global _model, _scaler, _yolo
+
+    if _model is not None and _scaler is not None and _yolo is not None:
+        return
+
+    if not os.path.isfile(MODEL_PATH):
+        raise FileNotFoundError(f"Model file not found: {MODEL_PATH}")
+    if not os.path.isfile(SCALER_PATH):
+        raise FileNotFoundError(f"Scaler file not found: {SCALER_PATH}")
+
+    print("Loading ML models...")
+    _model = tf.keras.models.load_model(MODEL_PATH)
+    _scaler = joblib.load(SCALER_PATH)
+    _yolo = YOLO(resolve_yolo_weights())
+    print("ML models loaded.")
 
 def pick_best_person_box(result):
     if not hasattr(result, "boxes") or result.boxes is None or result.boxes.xyxy.shape[0] == 0:
@@ -101,7 +126,7 @@ def extract_features_from_video(video_path, max_frames=10):
                 features.append(np.zeros(138, dtype=np.float32))
                 continue
 
-            results = yolo(frame, verbose=False)
+            results = _yolo(frame, verbose=False)
             result = results[0] if isinstance(results, list) and len(results) > 0 else results
             box = pick_best_person_box(result) or last_box
             last_box = box if box is not None else last_box
@@ -133,7 +158,7 @@ def prepare_input_tensor(frames_10):
         raise ValueError(f"Need 10 frames, got {frames_10.shape[0]}")
     velocity = np.gradient(frames_10[:, :99], axis=0)
     final_features = np.concatenate([frames_10, velocity], axis=-1)
-    final_scaled = scaler.transform(final_features)
+    final_scaled = _scaler.transform(final_features)
     return np.expand_dims(final_scaled, axis=0)
 
 # === Save frames with pose overlay ===
@@ -161,7 +186,7 @@ def save_frames_with_pose(video_path, file_id, output_dir=OUTPUT_DIR, num_frames
             ret, frame = cap.read()
             if not ret: continue
 
-            results = yolo(frame, verbose=False)
+            results = _yolo(frame, verbose=False)
             result = results[0] if isinstance(results, list) and len(results) > 0 else results
             box = pick_best_person_box(result) or last_box
             last_box = box if box is not None else last_box
@@ -192,10 +217,11 @@ def save_frames_with_pose(video_path, file_id, output_dir=OUTPUT_DIR, num_frames
 
 # === Final prediction ===
 def final_prediction(video_path, file_id=0):
+    _ensure_models_loaded()
     frames = extract_features_from_video(video_path)
     input_tensor = prepare_input_tensor(frames)
     print("Getting the prediction...")
-    pred = model.predict(input_tensor)
+    pred = _model.predict(input_tensor)
     print("Prediction done.")
     save_frames_with_pose(video_path, file_id)
 
