@@ -3,9 +3,12 @@ set -euo pipefail
 
 APP_DIR="${APP_DIR:-/home/ubuntu/mybackend_bh}"
 SERVICE_NAME="${SERVICE_NAME:-javelin-api}"
-PYTHON_BIN="${PYTHON_BIN:-python3}"
 VENV_DIR="${VENV_DIR:-$APP_DIR/venv}"
 BRANCH="${BRANCH:-main}"
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=resolve-python.sh
+source "$SCRIPT_DIR/resolve-python.sh"
 
 echo "==> Deploying from $APP_DIR"
 
@@ -20,15 +23,20 @@ echo "==> Pulling latest code"
 git fetch origin "$BRANCH"
 git reset --hard "origin/$BRANCH"
 
-if [ ! -d "$VENV_DIR" ]; then
-  echo "==> Creating virtual environment"
+chmod +x scripts/deploy.sh scripts/resolve-python.sh
+
+ensure_python
+
+if [ ! -d "$VENV_DIR" ] || ! "$VENV_DIR/bin/python" -c "import sys; exit(0 if sys.version_info[:2] in ((3,12),(3,11)) else 1)" 2>/dev/null; then
+  echo "==> Creating virtual environment with $PYTHON_BIN"
+  rm -rf "$VENV_DIR"
   "$PYTHON_BIN" -m venv "$VENV_DIR"
 fi
 
 # shellcheck disable=SC1090
 source "$VENV_DIR/bin/activate"
 
-echo "==> Installing dependencies"
+echo "==> Installing dependencies ($(python --version))"
 python -m pip install --upgrade pip
 pip install -r requirements.txt
 
