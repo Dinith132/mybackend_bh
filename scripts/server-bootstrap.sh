@@ -29,7 +29,7 @@ if [ ! -d "$APP_DIR/.git" ]; then
 fi
 
 cd "$APP_DIR"
-chmod +x scripts/deploy.sh scripts/diagnose.sh scripts/restart-api.sh
+chmod +x scripts/deploy.sh scripts/diagnose.sh scripts/restart-api.sh scripts/setup-nginx.sh
 
 echo "==> Creating virtual environment"
 python3 -m venv venv
@@ -43,8 +43,14 @@ sudo systemctl daemon-reload
 sudo systemctl enable "$SERVICE_NAME"
 bash scripts/restart-api.sh
 
+echo "==> Setting up Nginx (public port 80)"
+bash scripts/setup-nginx.sh
+
 echo
 echo "Bootstrap complete."
+PUBLIC_IP="$(curl -s http://checkip.amazonaws.com || true)"
+echo "Test from your laptop: curl http://${PUBLIC_IP:-<EC2_PUBLIC_IP>}/check"
+echo "Frontend .env: EXPO_PUBLIC_API_URL=http://${PUBLIC_IP:-<EC2_PUBLIC_IP>}"
 echo "Next steps:"
 echo "  1. Add GitHub secrets: EC2_HOST, EC2_USER, EC2_SSH_KEY"
 echo "  2. Optional: EC2_APP_DIR, EC2_HEALTH_URL"

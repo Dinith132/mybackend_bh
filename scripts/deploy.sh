@@ -37,3 +37,9 @@ sudo cp deploy/javelin-api.service "/etc/systemd/system/${SERVICE_NAME}.service"
 sudo systemctl daemon-reload
 sudo systemctl enable "$SERVICE_NAME"
 bash scripts/restart-api.sh
+
+if [ -x scripts/setup-nginx.sh ]; then
+  bash scripts/setup-nginx.sh
+fi
+
+echo "Deploy completed successfully"
