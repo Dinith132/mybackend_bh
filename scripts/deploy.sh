@@ -33,15 +33,7 @@ python -m pip install --upgrade pip
 pip install -r requirements.txt
 
 echo "==> Restarting service"
+sudo cp deploy/javelin-api.service "/etc/systemd/system/${SERVICE_NAME}.service"
 sudo systemctl daemon-reload
 sudo systemctl enable "$SERVICE_NAME"
-sudo systemctl restart "$SERVICE_NAME"
-
-echo "==> Waiting for service"
-sleep 3
-sudo systemctl is-active --quiet "$SERVICE_NAME"
-
-echo "==> Local health check"
-curl --fail --retry 10 --retry-delay 3 http://127.0.0.1:8000/check
-
-echo "Deploy completed successfully"
+bash scripts/restart-api.sh

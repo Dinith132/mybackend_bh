@@ -11,7 +11,9 @@ Environment=TF_CPP_MIN_LOG_LEVEL=2
 Environment=OMP_NUM_THREADS=1
 ExecStart=/home/ubuntu/mybackend_bh/venv/bin/gunicorn -w 1 -b 127.0.0.1:8000 app:app --timeout 300 --graceful-timeout 300 --capture-output --log-level info
 Restart=always
-RestartSec=10
+RestartSec=3
+TimeoutStopSec=30
+KillMode=mixed
 StandardOutput=journal
 StandardError=journal
 

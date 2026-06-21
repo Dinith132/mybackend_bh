@@ -29,7 +29,7 @@ if [ ! -d "$APP_DIR/.git" ]; then
 fi
 
 cd "$APP_DIR"
-chmod +x scripts/deploy.sh
+chmod +x scripts/deploy.sh scripts/diagnose.sh scripts/restart-api.sh
 
 echo "==> Creating virtual environment"
 python3 -m venv venv
@@ -41,11 +41,7 @@ echo "==> Installing systemd service"
 sudo cp deploy/javelin-api.service "/etc/systemd/system/${SERVICE_NAME}.service"
 sudo systemctl daemon-reload
 sudo systemctl enable "$SERVICE_NAME"
-sudo systemctl restart "$SERVICE_NAME"
-
-echo "==> Verifying local health check"
-sleep 5
-curl --fail --retry 5 --retry-delay 3 http://127.0.0.1:8000/check
+bash scripts/restart-api.sh
 
 echo
 echo "Bootstrap complete."

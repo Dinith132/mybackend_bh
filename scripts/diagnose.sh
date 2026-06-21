@@ -21,6 +21,10 @@ echo "=== Service status ==="
 systemctl status javelin-api --no-pager -l || true
 
 echo
+echo "=== Port 8000 ==="
+sudo ss -ltnp | grep ':8000' || echo "Nothing listening on port 8000"
+
+echo
 echo "=== Recent service logs ==="
 journalctl -u javelin-api -n 40 --no-pager || true
 

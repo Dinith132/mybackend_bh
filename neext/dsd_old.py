@@ -3,8 +3,6 @@ import math
 import cv2
 import numpy as np
 import joblib
-import tensorflow as tf
-from ultralytics import YOLO
 
 # === Base Paths ===
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -49,6 +47,9 @@ def _ensure_models_loaded():
         raise FileNotFoundError(f"Scaler file not found: {SCALER_PATH}")
 
     print("Loading ML models...")
+    import tensorflow as tf
+    from ultralytics import YOLO
+
     _model = tf.keras.models.load_model(MODEL_PATH)
     _scaler = joblib.load(SCALER_PATH)
     _yolo = YOLO(resolve_yolo_weights())
