@@ -5,7 +5,6 @@ import numpy as np
 import joblib
 import tensorflow as tf
 from ultralytics import YOLO
-import mediapipe as mp
 
 # === Base Paths ===
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -31,8 +30,11 @@ def resolve_yolo_weights():
 _model = None
 _scaler = None
 _yolo = None
-mp_pose = mp.solutions.pose
-POSE_CONNS = list(mp_pose.POSE_CONNECTIONS)
+
+
+def _get_mp_pose():
+    import mediapipe as mp
+    return mp.solutions.pose
 
 
 def _ensure_models_loaded():
@@ -118,7 +120,7 @@ def extract_features_from_video(video_path, max_frames=10):
     features = []
     last_box = None
 
-    with mp_pose.Pose(static_image_mode=False, model_complexity=1, min_detection_confidence=0.5) as pose:
+    with _get_mp_pose().Pose(static_image_mode=False, model_complexity=1, min_detection_confidence=0.5) as pose:
         for idx in frame_indices:
             cap.set(cv2.CAP_PROP_POS_FRAMES, idx)
             ret, frame = cap.read()
@@ -180,7 +182,7 @@ def save_frames_with_pose(video_path, file_id, output_dir=OUTPUT_DIR, num_frames
     out = cv2.VideoWriter(output_path, fourcc, fps, (width, height))
     last_box = None
 
-    with mp_pose.Pose(static_image_mode=False, model_complexity=1, min_detection_confidence=0.5) as pose:
+    with _get_mp_pose().Pose(static_image_mode=False, model_complexity=1, min_detection_confidence=0.5) as pose:
         for i, idx in enumerate(frame_indices):
             cap.set(cv2.CAP_PROP_POS_FRAMES, idx)
             ret, frame = cap.read()
