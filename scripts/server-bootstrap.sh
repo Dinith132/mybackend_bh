@@ -35,7 +35,6 @@ fi
 cd "$APP_DIR"
 chmod +x scripts/deploy.sh scripts/resolve-python.sh
 
-ensure_python
 
 echo "==> Creating virtual environment"
 rm -rf venv
