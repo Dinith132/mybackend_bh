@@ -35,6 +35,29 @@ def _get_mp_pose():
     return mp.solutions.pose
 
 
+def get_pose_connections():
+    return list(_get_mp_pose().POSE_CONNECTIONS)
+
+
+def draw_skeleton(frame, landmarks, src_w, src_h, off_x=0, off_y=0):
+    frame_h, frame_w = frame.shape[:2]
+    points = []
+
+    for lm in landmarks:
+        x = int(lm.x * src_w + off_x)
+        y = int(lm.y * src_h + off_y)
+        x = max(0, min(frame_w - 1, x))
+        y = max(0, min(frame_h - 1, y))
+        points.append((x, y))
+
+    for a, b in get_pose_connections():
+        if a < len(points) and b < len(points):
+            cv2.line(frame, points[a], points[b], (0, 255, 0), 2)
+
+    for x, y in points:
+        cv2.circle(frame, (x, y), 3, (255, 0, 0), -1)
+
+
 def _ensure_models_loaded():
     global _model, _scaler, _yolo
 
@@ -206,10 +229,14 @@ def save_frames_with_pose(video_path, file_id, output_dir=OUTPUT_DIR, num_frames
                 src_h, src_w = cropped.shape[:2]
 
             if results_pose.pose_landmarks:
-                for lm in results_pose.pose_landmarks.landmark:
-                    cx = int(lm.x * src_w + off_x)
-                    cy = int(lm.y * src_h + off_y)
-                    cv2.circle(frame, (cx, cy), 3, (255, 0, 0), -1)
+                draw_skeleton(
+                    frame,
+                    results_pose.pose_landmarks.landmark,
+                    src_w,
+                    src_h,
+                    off_x,
+                    off_y,
+                )
 
             out.write(frame)
             print(f"✅ Saved frame {i+1}/{num_frames} to video")
