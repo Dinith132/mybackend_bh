@@ -5,6 +5,9 @@ on:
     branches: [main]
   workflow_dispatch:
 
+permissions:
+  contents: read
+
 concurrency:
   group: deploy-ec2
   cancel-in-progress: false
@@ -12,6 +15,7 @@ concurrency:
 jobs:
   deploy:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
 
     steps:
       - name: Deploy over SSH
@@ -26,10 +30,21 @@ jobs:
           script: |
             set -euo pipefail
             APP_DIR="/home/ubuntu/mybackend_bh"
-            if [ -n "${{ secrets.EC2_APP_DIR }}" ]; then
-              APP_DIR="${{ secrets.EC2_APP_DIR }}"
+            SERVICE_NAME="javelin-api"
+            BRANCH="main"
+
+            if [ -n '${{ secrets.EC2_APP_DIR }}' ]; then
+              APP_DIR='${{ secrets.EC2_APP_DIR }}'
             fi
+
+            if [ -n '${{ secrets.EC2_SERVICE_NAME }}' ]; then
+              SERVICE_NAME='${{ secrets.EC2_SERVICE_NAME }}'
+            fi
+
             export APP_DIR
+            export SERVICE_NAME
+            export BRANCH
+
             cd "$APP_DIR"
             bash scripts/deploy.sh
 
