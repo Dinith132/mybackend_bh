@@ -18,13 +18,11 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: "3.11"
-          cache: pip
-          cache-dependency-path: requirements.txt
 
-      - name: Install dependencies
+      - name: Install lightweight CI dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install -r requirements.txt
+          pip install Flask==3.1.2 flask_cors==6.0.1
 
       - name: Verify app imports
         run: python -c "from app import app; print('app import ok')"

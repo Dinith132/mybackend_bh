@@ -42,20 +42,31 @@ def get_pose_connections():
 def draw_skeleton(frame, landmarks, src_w, src_h, off_x=0, off_y=0):
     frame_h, frame_w = frame.shape[:2]
     points = []
+    visibility_threshold = 0.35
 
     for lm in landmarks:
         x = int(lm.x * src_w + off_x)
         y = int(lm.y * src_h + off_y)
         x = max(0, min(frame_w - 1, x))
         y = max(0, min(frame_h - 1, y))
-        points.append((x, y))
+        visibility = getattr(lm, "visibility", 1.0)
+        points.append((x, y, visibility))
 
     for a, b in get_pose_connections():
         if a < len(points) and b < len(points):
-            cv2.line(frame, points[a], points[b], (0, 255, 0), 2)
+            x1, y1, visibility_a = points[a]
+            x2, y2, visibility_b = points[b]
 
-    for x, y in points:
-        cv2.circle(frame, (x, y), 3, (255, 0, 0), -1)
+            if visibility_a < visibility_threshold or visibility_b < visibility_threshold:
+                continue
+
+            start = (x1, y1)
+            end = (x2, y2)
+
+            # Draw a bold outline first, then the bright skeleton line.
+            # This keeps the sketch visible on both dark and bright videos.
+            cv2.line(frame, start, end, (0, 0, 0), 6, cv2.LINE_AA)
+            cv2.line(frame, start, end, (0, 255, 255), 3, cv2.LINE_AA)
 
 
 def _ensure_models_loaded():
